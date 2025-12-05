@@ -4,7 +4,7 @@ import * as THREE from "three";
 import { OrbitControls } from "@react-three/drei";
 
 // The only data you maintain
-const SCENES = ["aurora", "canyon"];
+const SCENES = ["aurora", "mountains", "tropical_sea", "underwater_ruins"];
 const DESKTOP_FOV = 70; // Set default FOV for desktop/large screens
 const MOBILE_FOV = 85;  // Higher FOV for mobile/small screens
 const INITIAL_CAMERA_POSITION = [0, 0, 0.1];
@@ -15,7 +15,10 @@ function makeScene(id) {
   const base = `/scenes/${id}`;
   return {
     id,
-    name: id[0].toUpperCase() + id.slice(1),
+    name: id
+      .split("_")
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(" "),
     layout: `${base}/layout.png`,
     faces: {
       right: `${base}/right.png`,
@@ -53,7 +56,7 @@ function CubeViewer({ faces }) {
   return null;
 }
 
-// Component for FOV-based Zoom/Scrolling sensitivity AND Touch Zoom
+// Component for FOV-based Zoom/Scrolling sensitivity AND Touch Zoom (Pinch-to-Zoom)
 function FovZoomHandler() {
   const { camera } = useThree();
   // Ref to store the distance between two fingers at the start of a pinch gesture
@@ -115,36 +118,38 @@ function FovZoomHandler() {
       camera.updateProjectionMatrix();
     };
 
-    const element = document.getElementById('canvas-container'); 
-
-    if (!element) return; // Guard clause for initialization
-
-    // Attach mouse wheel listener to the window
+    // Use the window object for global mouse wheel events
     window.addEventListener("wheel", handleWheel, { passive: false });
     
-    // Attach touch listeners to the container element
-    element.addEventListener("touchstart", handleTouchStart, { passive: false });
-    element.addEventListener("touchmove", handleTouchMove, { passive: false });
-    element.addEventListener("touchend", handleTouchEnd, { passive: false });
+    const element = document.getElementById('canvas-container'); 
+
+    if (element) {
+      // Attach touch listeners to the container element
+      element.addEventListener("touchstart", handleTouchStart, { passive: false });
+      element.addEventListener("touchmove", handleTouchMove, { passive: false });
+      element.addEventListener("touchend", handleTouchEnd, { passive: false });
+    }
 
     return () => {
       window.removeEventListener("wheel", handleWheel);
-      element.removeEventListener("touchstart", handleTouchStart);
-      element.removeEventListener("touchmove", handleTouchMove);
-      element.removeEventListener("touchend", handleTouchEnd);
+      if (element) {
+        element.removeEventListener("touchstart", handleTouchStart);
+        element.removeEventListener("touchmove", handleTouchMove);
+        element.removeEventListener("touchend", handleTouchEnd);
+      }
     };
   }, [camera]); // Dependencies ensure the latest 'camera' is used
 
   return null;
 }
 
-// Controls component with fixed 3x3 layout
-function ArrowControls({ controlsRef, showControls }) {
+// Controls component (The 3x3 Grid only)
+function ArrowControls({ controlsRef }) {
     
-    // Common classes for square buttons
-    const buttonClasses = "bg-white shadow-md rounded-lg text-xl font-bold w-12 h-12 flex items-center justify-center transition-colors hover:bg-gray-200 active:scale-95 focus:outline-none focus:ring-2 focus:ring-blue-500";
-    // Class for invisible placeholders to maintain square grid cells
-    const placeholderClasses = "w-12 h-12"; 
+    // Common classes for square buttons (Reduced size: w-10 h-10 and text-lg)
+    const buttonClasses = "bg-white shadow-md rounded-lg text-lg font-bold w-10 h-10 flex items-center justify-center transition-colors hover:bg-gray-200 active:scale-95 focus:outline-none focus:ring-2 focus:ring-blue-500";
+    // Class for invisible placeholders to maintain square grid cells (Reduced size: w-10 h-10)
+    const placeholderClasses = "w-10 h-10"; 
 
     // Helper function for programmatically rotating the camera
     const rotate = useCallback((angleX, angleY) => {
@@ -208,14 +213,10 @@ function ArrowControls({ controlsRef, showControls }) {
 
 
   return (
-    // Conditional visibility: Uses opacity and pointer-events to hide/show smoothly
-    <div className={`absolute top-20 right-4 flex flex-col items-end z-10 transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}> 
-      {/* 3x3 Control Grid - Now strictly 9 items for square layout */}
       <div className="grid grid-cols-3 gap-2 p-3 bg-gray-100/80 backdrop-blur-sm rounded-xl shadow-2xl border border-gray-200">
         
         {/* Row 1: [Placeholder] [UP] [Placeholder] */}
         <div className={placeholderClasses}></div> {/* Col 1 */}
-        {/* FIX: Swapped UP sign to move view higher */}
         <button className={buttonClasses} onClick={() => rotate(0, 0.1)}>↑</button> {/* Col 2: UP */}
         <div className={placeholderClasses}></div> {/* Col 3 */}
 
@@ -226,11 +227,9 @@ function ArrowControls({ controlsRef, showControls }) {
 
         {/* Row 3: [ZOOM IN] [DOWN] [ZOOM OUT] */}
         <button className={buttonClasses} onClick={() => zoom(-5)} title="Zoom In">+</button> {/* Col 1: ZOOM IN */}
-        {/* FIX: Swapped DOWN sign to move view lower */}
         <button className={buttonClasses} onClick={() => rotate(0, -0.1)}>↓</button> {/* Col 2: DOWN */}
         <button className={buttonClasses} onClick={() => zoom(5)} title="Zoom Out">-</button> {/* Col 3: ZOOM OUT */}
       </div>
-    </div>
   );
 }
 
@@ -272,23 +271,20 @@ export default function App() {
   return (
     // Ensure the main container takes full screen width/height
     <div className="w-screen h-screen font-sans bg-gray-50 overflow-auto"> 
-      {/* Scrollable container for the gallery view */}
 
       {!selected && (
         <div className="max-w-4xl mx-auto p-6 min-h-screen flex flex-col">
           <header className="text-center mb-8">
-            <h1 className="text-4xl font-extrabold text-gray-800">360° Panorama Gallery</h1>
-            <h2 className="text-xl font-bold mt-2 text-gray-600">CS492(C) Team 10: Visual Generation Contest</h2>
+            <h1 className="text-4xl font-extrabold text-gray-800">SyncCube Gallery</h1>
+            <h2 className="text-xl font-bold mt-2 text-gray-600">CS492(C) Visual Generation Contest: Team 10</h2>
           </header>
           
-          {/* Removed flex-grow to ensure the footer is correctly positioned beneath the content */}
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6"> 
             {SCENES.map((id) => {
               const item = makeScene(id);
               return (
                 <div
                   key={id}
-                  // UPDATED THUMBNAIL BUTTON STYLES for a more interactive and visually appealing look
                   className="cursor-pointer bg-white border-2 border-transparent rounded-2xl overflow-hidden shadow-2xl transition duration-300 transform hover:scale-[1.03] hover:border-blue-500 p-4"
                   onClick={() => selectItem(item)}
                 >
@@ -304,9 +300,8 @@ export default function App() {
             })}
           </div>
           
-          {/* Footer with Team Information */}
           <footer className="mt-12 pt-6 border-t border-gray-300 text-center text-sm text-gray-600">
-            <p className="font-semibold mb-2 text-gray-700">Team 10 Members & Contact:</p>
+            <p className="font-semibold mb-2 text-gray-700">Members & Contact:</p>
             <div className="flex flex-col sm:flex-row justify-center space-y-1 sm:space-y-0 sm:space-x-4">
                 <p>Dongwoo Won (<a href="mailto:aiwwdw@kaist.ac.kr" className="text-blue-600 hover:text-blue-800 font-medium">aiwwdw@kaist.ac.kr</a>)</p>
                 <p>Dongheon Han (<a href="mailto:henongod@gmail.com" className="text-blue-600 hover:text-blue-800 font-medium">henongod@gmail.com</a>)</p>
@@ -317,7 +312,6 @@ export default function App() {
       )}
 
       {selected && (
-        // Added ID for FovZoomHandler to attach event listeners
         <div id="canvas-container" className="w-full h-full relative"> 
           <Canvas
             className="w-full h-full"
@@ -333,45 +327,44 @@ export default function App() {
               autoRotateSpeed={0.5}
               rotateSpeed={-0.5}
               enableZoom={false} // zoom handled manually via FOV scrolling/buttons/touch
-              // Damping disabled
               enableDamping={false}
-              // Arrow keys enabled for built-in navigation
               enableKeys={true}
             />
           </Canvas>
 
-          {/* Pass the visibility state to ArrowControls */}
-          {/* Note: ArrowControls remains right-aligned, but the top positioning is now defined by the surrounding header container for cleaner management. */}
-          <ArrowControls controlsRef={controlsRef} showControls={showControls} />
-
-          {/* === ALIGNMENT FIX: New Header Bar === */}
-          <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-center z-20">
-              
-              {/* Left Side: Back button */}
+          {/* TOP LEFT: Back button */}
+          <div className="absolute top-4 left-4 z-20">
               <button
-                  className="bg-white px-4 py-2 rounded-xl shadow-lg font-medium text-gray-700 hover:bg-gray-100 transition duration-150"
+                  className="bg-gray-100 px-4 py-2 rounded-xl shadow-xl font-medium text-gray-700 hover:bg-gray-200 transition duration-150 border border-gray-300"
                   onClick={goHome}
               >
-                  ← Back to Gallery
+                  ← Back
               </button>
-          
-              {/* Right Side: Title and Toggle Button */}
-              <div className="flex items-center space-x-2">
-                  {/* Toggle Button for Controls Visibility */}
-                  <button
-                      className="bg-white px-4 py-2 rounded-xl shadow-lg font-medium text-gray-700 hover:bg-gray-100 transition duration-150"
-                      onClick={() => setShowControls(prev => !prev)}
-                  >
-                      {showControls ? 'Hide Controls' : 'Show Controls'} 
-                  </button>
-
-                  {/* Title Overlay */}
-                  <div className="p-2 bg-white/70 backdrop-blur-sm rounded-xl shadow-lg">
-                      <h2 className="text-xl font-bold text-gray-800">{selected.name}</h2>
-                  </div>
-              </div>
           </div>
-          {/* ================================== */}
+
+          {/* TOP RIGHT: Controls Group (3x3 Grid and Toggle Button) */}
+          <div className="absolute top-4 right-4 flex flex-col items-end z-20">
+              
+              {/* 3x3 Arrow Controls Grid - Collapsible container */}
+              <div className={`
+                transition-[opacity,max-height,margin] duration-300 ease-in-out overflow-hidden
+                ${showControls 
+                    ? 'opacity-100 pointer-events-auto max-h-96 mb-2' // Visible: tall max-height and margin-bottom
+                    : 'opacity-0 pointer-events-none max-h-0 mb-0'    // Hidden: zero height/margin, invisible, unclickable
+                }
+              `}>
+                  <ArrowControls controlsRef={controlsRef} /> 
+              </div>
+              
+              {/* Toggle Button - Will sit directly under the grid (mb-2 gap) or at the top when collapsed */}
+              <button
+                  className="px-4 py-2 rounded-xl font-medium text-blue-600 hover:text-blue-800 transition duration-150 border-2 border-blue-600 bg-white shadow-xl"
+                  onClick={() => setShowControls(prev => !prev)}
+                  title={showControls ? 'Hide keyboard and button controls' : 'Show keyboard and button controls'}
+              >
+                  {showControls ? 'Hide Controls' : 'Show Controls'} 
+              </button>
+          </div>
         </div>
       )}
     </div>

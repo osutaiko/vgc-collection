@@ -222,7 +222,7 @@ function ArrowControls({ controlsRef }) {
 
         {/* Row 2: [LEFT] [REVERT] [RIGHT] */}
         <button className={buttonClasses} onClick={() => rotate(0.1, 0)}>←</button> {/* Col 1: LEFT */}
-        <button className={buttonClasses} onClick={revertView} title="Revert to Default View">🎯</button> {/* Col 2: REVERT */}
+        <button className={buttonClasses} onClick={revertView} title="Revert to Default View">🏠</button> {/* Col 2: REVERT */}
         <button className={buttonClasses} onClick={() => rotate(-0.1, 0)}>→</button> {/* Col 3: RIGHT */}
 
         {/* Row 3: [ZOOM IN] [DOWN] [ZOOM OUT] */}

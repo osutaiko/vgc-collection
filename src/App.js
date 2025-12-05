@@ -5,7 +5,8 @@ import { OrbitControls } from "@react-three/drei";
 
 // The only data you maintain
 const SCENES = ["aurora", "canyon"];
-const DEFAULT_FOV = 60;
+const DESKTOP_FOV = 70; // Set default FOV for desktop/large screens
+const MOBILE_FOV = 85;  // Higher FOV for mobile/small screens
 const INITIAL_CAMERA_POSITION = [0, 0, 0.1];
 const INITIAL_TARGET = [0, 0, 0];
 
@@ -52,29 +53,93 @@ function CubeViewer({ faces }) {
   return null;
 }
 
-// Component for FOV-based Zoom/Scrolling sensitivity
+// Component for FOV-based Zoom/Scrolling sensitivity AND Touch Zoom
 function FovZoomHandler() {
   const { camera } = useThree();
+  // Ref to store the distance between two fingers at the start of a pinch gesture
+  const initialTouchDistance = useRef(null); 
+  // Increased sensitivity factor for zoom
+  const ZOOM_SENSITIVITY = 0.15;
+
+  // Helper to calculate Euclidean distance between two touch points
+  const getDistance = (touches) => {
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  };
+
+  // 1. Handle touch start (capture initial distance)
+  const handleTouchStart = (e) => {
+    if (e.touches.length === 2) {
+      initialTouchDistance.current = getDistance(e.touches);
+    } else {
+      initialTouchDistance.current = null;
+    }
+  };
+
+  // 2. Handle touch move (calculate zoom based on distance change)
+  const handleTouchMove = (e) => {
+    if (e.touches.length === 2 && initialTouchDistance.current !== null) {
+      // Prevent default browser behavior (like scrolling the page)
+      e.preventDefault(); 
+
+      const currentDistance = getDistance(e.touches);
+      // Positive delta means pinching in (zoom out, increase FOV)
+      // Negative delta means pinching out (zoom in, decrease FOV)
+      const deltaDistance = initialTouchDistance.current - currentDistance; 
+      
+      // Calculate a scaled zoom factor using the increased sensitivity
+      const zoomFactor = deltaDistance * ZOOM_SENSITIVITY; 
+
+      camera.fov += zoomFactor;
+      // Clamp FOV between a reasonable range (30 to 100 degrees)
+      camera.fov = Math.min(Math.max(camera.fov, 30), 100); 
+      camera.updateProjectionMatrix();
+
+      // Update initial distance for smooth continuous zooming
+      initialTouchDistance.current = currentDistance;
+    }
+  };
+
+  // 3. Handle touch end (reset distance)
+  const handleTouchEnd = () => {
+    initialTouchDistance.current = null;
+  };
 
   useEffect(() => {
+    // --- Mouse Wheel (Existing) ---
     const handleWheel = (e) => {
-      // Increased scrolling sensitivity
-      camera.fov += e.deltaY * 0.05; 
+      // Increased scrolling sensitivity, consistent with touch
+      camera.fov += e.deltaY * ZOOM_SENSITIVITY; 
       camera.fov = Math.min(Math.max(camera.fov, 30), 100); // Range
       camera.updateProjectionMatrix();
     };
 
-    // Attach listener to the window element
-    window.addEventListener("wheel", handleWheel, { passive: false });
+    const element = document.getElementById('canvas-container'); 
 
-    return () => window.removeEventListener("wheel", handleWheel);
-  }, [camera]);
+    if (!element) return; // Guard clause for initialization
+
+    // Attach mouse wheel listener to the window
+    window.addEventListener("wheel", handleWheel, { passive: false });
+    
+    // Attach touch listeners to the container element
+    element.addEventListener("touchstart", handleTouchStart, { passive: false });
+    element.addEventListener("touchmove", handleTouchMove, { passive: false });
+    element.addEventListener("touchend", handleTouchEnd, { passive: false });
+
+    return () => {
+      window.removeEventListener("wheel", handleWheel);
+      element.removeEventListener("touchstart", handleTouchStart);
+      element.removeEventListener("touchmove", handleTouchMove);
+      element.removeEventListener("touchend", handleTouchEnd);
+    };
+  }, [camera]); // Dependencies ensure the latest 'camera' is used
 
   return null;
 }
 
 // Controls component with fixed 3x3 layout
-function ArrowControls({ controlsRef }) {
+function ArrowControls({ controlsRef, showControls }) {
     
     // Common classes for square buttons
     const buttonClasses = "bg-white shadow-md rounded-lg text-xl font-bold w-12 h-12 flex items-center justify-center transition-colors hover:bg-gray-200 active:scale-95 focus:outline-none focus:ring-2 focus:ring-blue-500";
@@ -127,12 +192,15 @@ function ArrowControls({ controlsRef }) {
         const controls = controlsRef.current;
         const camera = controls.object;
 
+        // Reset to responsive default FOV
+        const defaultFov = window.innerWidth < 640 ? MOBILE_FOV : DESKTOP_FOV;
+
         // Reset Camera Position and Target
         camera.position.set(...INITIAL_CAMERA_POSITION);
         controls.target.set(...INITIAL_TARGET);
 
         // Reset FOV
-        camera.fov = DEFAULT_FOV;
+        camera.fov = defaultFov;
         camera.updateProjectionMatrix();
 
         controls.update();
@@ -140,13 +208,15 @@ function ArrowControls({ controlsRef }) {
 
 
   return (
-    <div className="absolute bottom-4 right-4 flex flex-col items-end z-10">
+    // Conditional visibility: Uses opacity and pointer-events to hide/show smoothly
+    <div className={`absolute top-20 right-4 flex flex-col items-end z-10 transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}> 
       {/* 3x3 Control Grid - Now strictly 9 items for square layout */}
       <div className="grid grid-cols-3 gap-2 p-3 bg-gray-100/80 backdrop-blur-sm rounded-xl shadow-2xl border border-gray-200">
         
         {/* Row 1: [Placeholder] [UP] [Placeholder] */}
         <div className={placeholderClasses}></div> {/* Col 1 */}
-        <button className={buttonClasses} onClick={() => rotate(0, -0.1)}>↑</button> {/* Col 2: UP */}
+        {/* FIX: Swapped UP sign to move view higher */}
+        <button className={buttonClasses} onClick={() => rotate(0, 0.1)}>↑</button> {/* Col 2: UP */}
         <div className={placeholderClasses}></div> {/* Col 3 */}
 
         {/* Row 2: [LEFT] [REVERT] [RIGHT] */}
@@ -156,7 +226,8 @@ function ArrowControls({ controlsRef }) {
 
         {/* Row 3: [ZOOM IN] [DOWN] [ZOOM OUT] */}
         <button className={buttonClasses} onClick={() => zoom(-5)} title="Zoom In">+</button> {/* Col 1: ZOOM IN */}
-        <button className={buttonClasses} onClick={() => rotate(0, 0.1)}>↓</button> {/* Col 2: DOWN */}
+        {/* FIX: Swapped DOWN sign to move view lower */}
+        <button className={buttonClasses} onClick={() => rotate(0, -0.1)}>↓</button> {/* Col 2: DOWN */}
         <button className={buttonClasses} onClick={() => zoom(5)} title="Zoom Out">-</button> {/* Col 3: ZOOM OUT */}
       </div>
     </div>
@@ -166,6 +237,10 @@ function ArrowControls({ controlsRef }) {
 export default function App() {
   const controlsRef = useRef(null);
   const [selected, setSelected] = useState(null);
+  // State for responsive FOV, initialized with desktop default.
+  const [fov, setFov] = useState(DESKTOP_FOV); 
+  // New state to manage controls visibility
+  const [showControls, setShowControls] = useState(true);
 
   // URL-based scene loading
   useEffect(() => {
@@ -175,6 +250,13 @@ export default function App() {
       if (loaded) setSelected(loaded);
     }
   }, []);
+
+  // Set initial FOV based on screen size (for mobile responsiveness)
+  useEffect(() => {
+    // Check if device is likely mobile (width less than Tailwind's 'sm' breakpoint 640px)
+    const initialFov = window.innerWidth < 640 ? MOBILE_FOV : DESKTOP_FOV;
+    setFov(initialFov);
+  }, []); // Run only once on mount
 
   // Change URL on selection
   function selectItem(item) {
@@ -193,27 +275,29 @@ export default function App() {
       {/* Scrollable container for the gallery view */}
 
       {!selected && (
-        <div className="max-w-4xl mx-auto p-6 flex flex-col">
+        <div className="max-w-4xl mx-auto p-6 min-h-screen flex flex-col">
           <header className="text-center mb-8">
             <h1 className="text-4xl font-extrabold text-gray-800">360° Panorama Gallery</h1>
             <h2 className="text-xl font-bold mt-2 text-gray-600">CS492(C) Team 10: Visual Generation Contest</h2>
           </header>
           
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 flex-grow">
+          {/* Removed flex-grow to ensure the footer is correctly positioned beneath the content */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6"> 
             {SCENES.map((id) => {
               const item = makeScene(id);
               return (
                 <div
                   key={id}
-                  className="cursor-pointer bg-white border border-gray-200 rounded-xl overflow-hidden shadow-lg hover:shadow-xl transition duration-300 p-4"
+                  // UPDATED THUMBNAIL BUTTON STYLES for a more interactive and visually appealing look
+                  className="cursor-pointer bg-white border-2 border-transparent rounded-2xl overflow-hidden shadow-2xl transition duration-300 transform hover:scale-[1.03] hover:border-blue-500 p-4"
                   onClick={() => selectItem(item)}
                 >
                   <img
                     src={item.layout}
                     alt={`Preview of ${item.name}`}
-                    className="w-full h-40 object-cover rounded-lg mb-3"
+                    className="w-full h-40 object-cover rounded-lg mb-3 shadow-md"
                   />
-                  <div className="text-center text-xl font-semibold text-gray-700">{item.name}</div>
+                  <div className="text-center text-xl font-bold text-gray-700">{item.name}</div>
                   <p className="text-sm text-gray-500 text-center mt-1">Click to explore</p>
                 </div>
               );
@@ -233,10 +317,11 @@ export default function App() {
       )}
 
       {selected && (
-        <div className="w-full h-full relative">
+        // Added ID for FovZoomHandler to attach event listeners
+        <div id="canvas-container" className="w-full h-full relative"> 
           <Canvas
             className="w-full h-full"
-            camera={{ fov: DEFAULT_FOV, position: INITIAL_CAMERA_POSITION }}
+            camera={{ fov: fov, position: INITIAL_CAMERA_POSITION }} 
           >
             <CubeViewer faces={selected.faces} />
             <FovZoomHandler />
@@ -247,7 +332,7 @@ export default function App() {
               autoRotate
               autoRotateSpeed={0.5}
               rotateSpeed={-0.5}
-              enableZoom={false} // zoom handled manually via FOV scrolling/buttons
+              enableZoom={false} // zoom handled manually via FOV scrolling/buttons/touch
               // Damping disabled
               enableDamping={false}
               // Arrow keys enabled for built-in navigation
@@ -255,20 +340,38 @@ export default function App() {
             />
           </Canvas>
 
-          <ArrowControls controlsRef={controlsRef} />
+          {/* Pass the visibility state to ArrowControls */}
+          {/* Note: ArrowControls remains right-aligned, but the top positioning is now defined by the surrounding header container for cleaner management. */}
+          <ArrowControls controlsRef={controlsRef} showControls={showControls} />
 
-          {/* Back button */}
-          <button
-            className="absolute top-4 left-4 bg-white px-4 py-2 rounded-xl shadow-lg font-medium text-gray-700 hover:bg-gray-100 transition duration-150 z-20"
-            onClick={goHome}
-          >
-            ← Back to Gallery
-          </button>
+          {/* === ALIGNMENT FIX: New Header Bar === */}
+          <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-center z-20">
+              
+              {/* Left Side: Back button */}
+              <button
+                  className="bg-white px-4 py-2 rounded-xl shadow-lg font-medium text-gray-700 hover:bg-gray-100 transition duration-150"
+                  onClick={goHome}
+              >
+                  ← Back to Gallery
+              </button>
           
-          {/* Title Overlay */}
-          <div className="absolute top-4 right-4 p-2 bg-white/70 backdrop-blur-sm rounded-xl shadow-lg z-20">
-              <h2 className="text-xl font-bold text-gray-800">{selected.name}</h2>
+              {/* Right Side: Title and Toggle Button */}
+              <div className="flex items-center space-x-2">
+                  {/* Toggle Button for Controls Visibility */}
+                  <button
+                      className="bg-white px-4 py-2 rounded-xl shadow-lg font-medium text-gray-700 hover:bg-gray-100 transition duration-150"
+                      onClick={() => setShowControls(prev => !prev)}
+                  >
+                      {showControls ? 'Hide Controls' : 'Show Controls'} 
+                  </button>
+
+                  {/* Title Overlay */}
+                  <div className="p-2 bg-white/70 backdrop-blur-sm rounded-xl shadow-lg">
+                      <h2 className="text-xl font-bold text-gray-800">{selected.name}</h2>
+                  </div>
+              </div>
           </div>
+          {/* ================================== */}
         </div>
       )}
     </div>

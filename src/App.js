@@ -276,7 +276,7 @@ export default function App() {
         <div className="max-w-4xl mx-auto p-6 min-h-screen flex flex-col">
           <header className="text-center mb-8">
             <h1 className="text-4xl font-extrabold text-gray-800">SyncCube Gallery</h1>
-            <h2 className="text-xl font-bold mt-2 text-gray-600">CS492(C) Visual Generation Contest: Team 10</h2>
+            <h2 className="text-xl font-bold mt-2 text-gray-600">CS492(C) Visual Generation Contest: Team 18</h2>
           </header>
           
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6"> 

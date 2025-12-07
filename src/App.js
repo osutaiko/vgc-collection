@@ -4,7 +4,7 @@ import * as THREE from "three";
 import { OrbitControls } from "@react-three/drei";
 
 // The only data you maintain
-const SCENES = ["aurora", "mountains", "tropical_sea", "underwater_ruins"];
+const SCENES = ["mystic_jungle", "van_gogh's_world", "forces_of_nature", "aurora", "tropical_sea", "cosmos", "grand_canyon"];
 const DESKTOP_FOV = 70; // Set default FOV for desktop/large screens
 const MOBILE_FOV = 85;  // Higher FOV for mobile/small screens
 const INITIAL_CAMERA_POSITION = [0, 0, 0.1];
